@@ -1,0 +1,80 @@
+{
+    "name": "PL_Initial_Load_Single_Table",
+    "properties": {
+        "parameters": {
+            "table_id": {"type": "string"},
+            "source_system_id": {"type": "string"},
+            "source_system_name": {"type": "string"},
+            "schema_name": {"type": "string"},
+            "table_name": {"type": "string"},
+            "primary_key_columns": {"type": "string"}
+        },
+        "variables": {
+            "run_id": {"type": "String"}
+        },
+        "activities": [
+            {
+                "name": "Set_RunId",
+                "type": "SetVariable",
+                "typeProperties": {
+                    "variableName": "run_id",
+                    "value": { "value": "@pipeline().RunId", "type": "Expression" }
+                }
+            },
+            {
+                "name": "Copy_Initial_Load",
+                "type": "Copy",
+                "dependsOn": [ { "activity": "Set_RunId", "dependencyConditions": [ "Succeeded" ] } ],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": { "value": "@concat('SELECT * FROM ', pipeline().parameters.schema_name, '.', pipeline().parameters.table_name)", "type": "Expression" }
+                    },
+                    "sink": { "type": "ParquetSink" },
+                    "enableStaging": false
+                },
+                "inputs": [
+                    {
+                        "referenceName": "DS_AzureSQL_Source",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "schema_name": { "value": "@pipeline().parameters.schema_name", "type": "Expression" },
+                            "table_name": { "value": "@pipeline().parameters.table_name", "type": "Expression" }
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_Parquet_Bronze_Initial",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "source_system_id": { "value": "@pipeline().parameters.source_system_id", "type": "Expression" },
+                            "schema_name": { "value": "@pipeline().parameters.schema_name", "type": "Expression" },
+                            "table_name": { "value": "@pipeline().parameters.table_name", "type": "Expression" },
+                            "run_id": { "value": "@variables('run_id')", "type": "Expression" }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Process_Initial_Load",
+                "type": "DatabricksNotebook",
+                "dependsOn": [ { "activity": "Copy_Initial_Load", "dependencyConditions": [ "Succeeded" ] } ],
+                "linkedServiceName": { "referenceName": "LS_AzureDatabricks", "type": "LinkedServiceReference" },
+                "typeProperties": {
+                    "notebookPath": "/bronze/Initial_Load_Dynamic",
+                    "baseParameters": {
+                        "table_id": { "value": "@pipeline().parameters.table_id", "type": "Expression" },
+                        "source_system_id": { "value": "@pipeline().parameters.source_system_id", "type": "Expression" },
+                        "source_system_name": { "value": "@pipeline().parameters.source_system_name", "type": "Expression" },
+                        "schema_name": { "value": "@pipeline().parameters.schema_name", "type": "Expression" },
+                        "table_name": { "value": "@pipeline().parameters.table_name", "type": "Expression" },
+                        "primary_key_columns": { "value": "@pipeline().parameters.primary_key_columns", "type": "Expression" },
+                        "run_id": { "value": "@variables('run_id')", "type": "Expression" },
+                        "rows_copied": { "value": "@string(activity('Copy_Initial_Load').output.rowsCopied)", "type": "Expression" }
+                    }
+                }
+            }
+        ]
+    }
+}

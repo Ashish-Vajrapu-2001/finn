@@ -1,0 +1,85 @@
+{
+    "name": "PL_Incremental_CDC_Single_Table",
+    "properties": {
+        "parameters": {
+            "table_id": {"type": "string"},
+            "source_system_id": {"type": "string"},
+            "source_system_name": {"type": "string"},
+            "schema_name": {"type": "string"},
+            "table_name": {"type": "string"},
+            "primary_key_columns": {"type": "string"}
+        },
+        "variables": {
+            "run_id": {"type": "String"}
+        },
+        "activities": [
+            {
+                "name": "Set_RunId",
+                "type": "SetVariable",
+                "typeProperties": {
+                    "variableName": "run_id",
+                    "value": { "value": "@pipeline().RunId", "type": "Expression" }
+                }
+            },
+            {
+                "name": "Copy_CDC_Changes",
+                "type": "Copy",
+                "dependsOn": [ { "activity": "Set_RunId", "dependencyConditions": [ "Succeeded" ] } ],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderStoredProcedureName": "control.sp_GetCDCChanges",
+                        "storedProcedureParameters": {
+                            "SchemaName": { "value": "@pipeline().parameters.schema_name", "type": "Expression" },
+                            "TableName": { "value": "@pipeline().parameters.table_name", "type": "Expression" },
+                            "TableId": { "value": "@pipeline().parameters.table_id", "type": "Expression" }
+                        }
+                    },
+                    "sink": { "type": "ParquetSink" },
+                    "enableStaging": false
+                },
+                "inputs": [ { "referenceName": "DS_ControlDB", "type": "DatasetReference" } ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_Parquet_Bronze_Incremental",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "source_system_id": { "value": "@pipeline().parameters.source_system_id", "type": "Expression" },
+                            "schema_name": { "value": "@pipeline().parameters.schema_name", "type": "Expression" },
+                            "table_name": { "value": "@pipeline().parameters.table_name", "type": "Expression" },
+                            "run_id": { "value": "@variables('run_id')", "type": "Expression" }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Check_Changes_Exist",
+                "type": "IfCondition",
+                "dependsOn": [ { "activity": "Copy_CDC_Changes", "dependencyConditions": [ "Succeeded" ] } ],
+                "typeProperties": {
+                    "expression": { "value": "@greater(activity('Copy_CDC_Changes').output.rowsCopied, 0)", "type": "Expression" },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Process_CDC_Changes",
+                            "type": "DatabricksNotebook",
+                            "linkedServiceName": { "referenceName": "LS_AzureDatabricks", "type": "LinkedServiceReference" },
+                            "typeProperties": {
+                                "notebookPath": "/bronze/Incremental_CDC_Dynamic",
+                                "baseParameters": {
+                                    "table_id": { "value": "@pipeline().parameters.table_id", "type": "Expression" },
+                                    "source_system_id": { "value": "@pipeline().parameters.source_system_id", "type": "Expression" },
+                                    "source_system_name": { "value": "@pipeline().parameters.source_system_name", "type": "Expression" },
+                                    "schema_name": { "value": "@pipeline().parameters.schema_name", "type": "Expression" },
+                                    "table_name": { "value": "@pipeline().parameters.table_name", "type": "Expression" },
+                                    "primary_key_columns": { "value": "@pipeline().parameters.primary_key_columns", "type": "Expression" },
+                                    "run_id": { "value": "@variables('run_id')", "type": "Expression" },
+                                    "rows_copied": { "value": "@string(activity('Copy_CDC_Changes').output.rowsCopied)", "type": "Expression" }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}

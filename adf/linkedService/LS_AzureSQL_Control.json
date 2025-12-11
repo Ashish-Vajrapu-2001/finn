@@ -1,0 +1,14 @@
+{
+    "name": "LS_AzureSQL_Control",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+            "connectionString": "Data Source=YOUR_SQL_SERVER_NAME.database.windows.net;Initial Catalog=YOUR_DATABASE_NAME;User ID=YOUR_SQL_USERNAME;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;",
+            "password": {
+                "type": "SecureString",
+                "value": "YOUR_SQL_PASSWORD_HERE"
+            }
+        }
+    }
+}

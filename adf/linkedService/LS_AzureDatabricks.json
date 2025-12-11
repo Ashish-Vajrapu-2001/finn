@@ -1,0 +1,15 @@
+{
+    "name": "LS_AzureDatabricks",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "type": "AzureDatabricks",
+        "typeProperties": {
+            "domain": "https://YOUR_DATABRICKS_WORKSPACE_URL",
+            "existingClusterId": "YOUR_CLUSTER_ID",
+            "accessToken": {
+                "type": "SecureString",
+                "value": "YOUR_DATABRICKS_ACCESS_TOKEN"
+            }
+        }
+    }
+}

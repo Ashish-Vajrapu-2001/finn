@@ -1,0 +1,75 @@
+{
+    "name": "PL_Master_Orchestrator",
+    "properties": {
+        "activities": [
+            {
+                "name": "Get_All_Tables",
+                "type": "Lookup",
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderStoredProcedureName": "control.sp_GetTableLoadOrder",
+                        "storedProcedureParameters": {
+                            "SourceSystemId": { "type": "String", "value": null }
+                        }
+                    },
+                    "dataset": { "referenceName": "DS_ControlDB", "type": "DatasetReference" },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "ForEach_Table",
+                "type": "ForEach",
+                "dependsOn": [ { "activity": "Get_All_Tables", "dependencyConditions": [ "Succeeded" ] } ],
+                "typeProperties": {
+                    "items": { "value": "@activity('Get_All_Tables').output.value", "type": "Expression" },
+                    "isSequential": false,
+                    "batchCount": 20,
+                    "activities": [
+                        {
+                            "name": "Route_By_Load_Status",
+                            "type": "IfCondition",
+                            "typeProperties": {
+                                "expression": { "value": "@equals(item().initial_load_completed, true)", "type": "Expression" },
+                                "ifFalseActivities": [
+                                    {
+                                        "name": "Exec_Initial_Load",
+                                        "type": "ExecutePipeline",
+                                        "typeProperties": {
+                                            "pipeline": { "referenceName": "PL_Initial_Load_Single_Table", "type": "PipelineReference" },
+                                            "parameters": {
+                                                "table_id": { "value": "@item().table_id", "type": "Expression" },
+                                                "source_system_id": { "value": "@item().source_system_id", "type": "Expression" },
+                                                "source_system_name": { "value": "@item().source_system_name", "type": "Expression" },
+                                                "schema_name": { "value": "@item().schema_name", "type": "Expression" },
+                                                "table_name": { "value": "@item().table_name", "type": "Expression" },
+                                                "primary_key_columns": { "value": "@item().primary_key_columns", "type": "Expression" }
+                                            }
+                                        }
+                                    }
+                                ],
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Exec_Incremental_CDC",
+                                        "type": "ExecutePipeline",
+                                        "typeProperties": {
+                                            "pipeline": { "referenceName": "PL_Incremental_CDC_Single_Table", "type": "PipelineReference" },
+                                            "parameters": {
+                                                "table_id": { "value": "@item().table_id", "type": "Expression" },
+                                                "source_system_id": { "value": "@item().source_system_id", "type": "Expression" },
+                                                "source_system_name": { "value": "@item().source_system_name", "type": "Expression" },
+                                                "schema_name": { "value": "@item().schema_name", "type": "Expression" },
+                                                "table_name": { "value": "@item().table_name", "type": "Expression" },
+                                                "primary_key_columns": { "value": "@item().primary_key_columns", "type": "Expression" }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}

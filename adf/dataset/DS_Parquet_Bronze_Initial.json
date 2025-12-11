@@ -1,0 +1,26 @@
+{
+    "name": "DS_Parquet_Bronze_Initial",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AzureDataLakeStorage",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "source_system_id": {"type": "string"},
+            "schema_name": {"type": "string"},
+            "table_name": {"type": "string"},
+            "run_id": {"type": "string"}
+        },
+        "type": "Parquet",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "folderPath": {
+                    "value": "@concat('bronze/', dataset().source_system_id, '/', dataset().schema_name, '/', dataset().table_name, '/initial_load/', dataset().run_id)",
+                    "type": "Expression"
+                },
+                "fileSystem": "datalake"
+            }
+        }
+    }
+}
